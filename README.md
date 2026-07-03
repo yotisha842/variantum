@@ -1,20 +1,24 @@
-# ВариантУм
+# ВариантУм 📝
 
-> **🥉 3 место** · Хакатон СберОбразование × Школа 21 «ИИ для образования: автоматизация рутинных задач»
+> **ИИ-сервис для автоматической генерации равносложных вариантов школьных контрольных работ.**
 
-**ИИ-сервис для автоматической генерации равносложных вариантов школьных контрольных работ.**
+🥉 **3 место** · Хакатон СберОбразование × Школа 21 «ИИ для образования: автоматизация рутинных задач»
 
 Один эталон из учебника — и за 5 минут вместо 2 часов учитель получает готовый комплект вариантов: одинаковых по сложности, разных по содержанию, сразу с ответами и экспортом в PDF/DOCX.
 
-![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2-6DB33F?logo=springboot)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
-![GigaChat](https://img.shields.io/badge/GigaChat-API-21A038?logo=sberbank)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql)
-![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker)
+![Демо ВариантУм](docs/demo.gif)
 
 ---
+
+## 📸 Скриншоты
+
+| Генерация вариантов | Редактор комплекта | Сравнение вариантов |
+|---|---|---|
+| ![Генерация](docs/generate.png) | ![Редактор](docs/edit.png) | ![Сравнение](docs/complex.png) |
+
+| Личная библиотека | Мобильная версия |
+|---|---|
+| ![Библиотека](docs/library.png) | ![Мобильная версия](docs/mobile.png) |
 
 ## Проблема
 
@@ -148,77 +152,40 @@ variantum/
 
 ## Запуск
 
-### Требования
-- **Docker** + **docker compose** (для полного стека)
-- Для разработки без Docker — **JDK 21** и **Node.js 20+**
-- **Ключ GigaChat** (Client ID + Client Secret) — получить в [GigaChat Studio](https://developers.sber.ru/studio/workspaces/)
-
-### Шаг 1. Переменные окружения
+Требуется **Docker** + **docker compose** и ключ **GigaChat** (Client ID + Secret из [GigaChat Studio](https://developers.sber.ru/studio/workspaces/)).
 
 ```bash
-cp .env.example .env
-```
-
-Обязательные значения в `.env`:
-
-| Переменная | Назначение |
-|---|---|
-| `GIGACHAT_CLIENT_ID` | UUID клиента из GigaChat Studio |
-| `GIGACHAT_CLIENT_SECRET` | секрет клиента |
-| `JWT_SECRET` | случайная строка — `openssl rand -base64 64` |
-| `DB_PASSWORD` | пароль PostgreSQL |
-| `MINIO_SECRET_KEY` | секрет MinIO |
-
-> Бесплатная модель называется `GigaChat` (не `GigaChat-2-Lite`). Основная — `GigaChat-2-Pro`.
-
-### Шаг 2а. Полный стек одной командой
-
-```bash
+cp .env.example .env      # указать GIGACHAT_CLIENT_ID / SECRET, JWT_SECRET, DB_PASSWORD
 docker compose up --build -d
 ```
 
 | Сервис | URL |
 |---|---|
 | Frontend | http://localhost |
-| Backend API | http://localhost/api |
-| Swagger UI | http://localhost/api/swagger-ui.html |
-| MinIO Console | http://localhost:9001 |
+| API / Swagger | http://localhost/api/swagger-ui.html |
 
-### Шаг 2б. Режим разработки
-
-```bash
-# Только инфраструктура
-docker compose up -d postgres redis minio
-
-# Backend → http://localhost:8080/api
-cd backend
-./mvnw spring-boot:run          # Windows: mvnw.cmd spring-boot:run
-
-# Frontend → http://localhost:5173
-cd frontend
-npm install && npm run dev
-```
-
-Миграции БД (Flyway) применяются автоматически при старте backend.
-
-### Проверка
-
-```bash
-curl http://localhost:8080/api/health   # → 200 OK
-```
-
-### Остановка
-
-```bash
-docker compose down          # остановить
-docker compose down -v       # остановить и удалить тома (данные пропадут)
-```
+Миграции БД (Flyway) применяются автоматически при старте.
 
 ---
+
+## Моя роль
+
+Backend (Java / Spring Boot):
+- REST API на Spring Boot 3 (Web / WebFlux), аутентификация и refresh-токены через Spring Security + JWT;
+- проектирование доменной модели и схемы PostgreSQL, миграции через Flyway; кэш и сессии на Redis;
+- интеграция GigaChat API с авто-фолбэком, распознавание документов (PDFBox / POI / Tesseract OCR);
+- экспорт комплектов в PDF / DOCX (iText, docx4j), загрузка файлов в MinIO (S3);
+- развёртывание стека в Docker / docker-compose за Nginx.
 
 ## Команда
 
 | | Имя | Роль |
 |---|---|---|
-| 👩‍💻 | **Кристина** | Backend (Java/Spring), Frontend, БД, Prompt Engineering |
+| 👩‍💻 | **Кристина** | Backend (Java/Spring), БД, интеграция с LLM, Prompt Engineering |
 | 👩‍💻 | **Соня** | Frontend (React/TS), UI-дизайн, Backend, Prompt Engineering |
+
+## 🏆 Награды
+
+🥉 **3 место** на хакатоне СберОбразование × Школа 21 «ИИ для образования».
+
+📄 [Диплом и материалы проекта (Google Drive)](https://drive.google.com/drive/folders/1aJMsg6jxIOsm5Cs1T9uVablbP38cRU91?usp=sharing)
