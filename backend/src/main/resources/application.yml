@@ -41,6 +41,16 @@ spring:
       max-file-size: 10MB
       max-request-size: 12MB
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    admin:
+      fail-fast: false
+
 server:
   port: 8080
   servlet:
@@ -106,6 +116,13 @@ app:
       - http://localhost:5173
       - http://localhost:3000
       - http://localhost
+
+  # Публикация событий "экспорт готов" / "документ проанализирован" в Kafka.
+  # Слушает variantum-worker (отдельный сервис, ведёт статистику). Если Kafka
+  # недоступна или отключена — приложение продолжает работать как обычно,
+  # публикация событий просто логирует предупреждение и не влияет на ответ API.
+  kafka:
+    enabled: ${KAFKA_ENABLED:true}
 
 logging:
   level:

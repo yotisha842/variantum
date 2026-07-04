@@ -61,6 +61,33 @@ services:
       timeout: 5s
       retries: 10
 
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: variantum-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: "ZmFrZS1jbHVzdGVyLWlkLTE"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
   # Одноразовый сервис: создаёт бакет при старте MinIO
   minio-init:
     image: minio/mc:latest
@@ -89,6 +116,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      kafka:
+        condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: ${APP_PROFILE:-dev}
       DB_HOST: postgres
@@ -119,8 +148,33 @@ services:
       RATE_LIMIT_LLM_PER_HOUR: ${RATE_LIMIT_LLM_PER_HOUR:-30}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
       SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
     ports:
       - "8080:8080"
+
+  # Отдельный сервис: слушает Kafka-события backend'а (экспорт готов / документ проанализирован)
+  # и ведёт по ним статистику в своих таблицах — независимый деплой, своя граница ответственности.
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: variantum-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-variantum}
+      DB_USER: ${DB_USER:-variantum}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme_strong_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8081:8081"
 
   frontend:
     build:
@@ -139,3 +193,4 @@ volumes:
   postgres-data:
   redis-data:
   minio-data:
+  kafka-data:

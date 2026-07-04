@@ -17,7 +17,8 @@ public record AppProperties(
         Minio minio,
         GigaChat gigachat,
         Ocr ocr,
-        Cors cors
+        Cors cors,
+        Kafka kafka
 ) {
     public record Jwt(
             String secret,
@@ -67,5 +68,10 @@ public record AppProperties(
 
     public record Cors(
             List<String> allowedOrigins
+    ) {}
+
+    /** Публикация событий в Kafka (для аналитики в variantum-worker). Не влияет на основной поток запроса. */
+    public record Kafka(
+            boolean enabled
     ) {}
 }

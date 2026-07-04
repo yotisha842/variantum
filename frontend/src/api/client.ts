@@ -10,11 +10,13 @@ export const apiClient = axios.create({
   },
 });
 
-// Глобальный обработчик ошибок: 401 → редирект на /login, всё остальное прокидываем дальше
+// Глобальный обработчик ошибок: 401/403 → редирект на /login, всё остальное прокидываем дальше
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    const status = error.response?.status;
+    if ((status === 401 || status === 403) && window.location.pathname !== '/login') {
+      localStorage.removeItem('variantum-auth');
       window.location.href = '/login';
     }
     return Promise.reject(error);

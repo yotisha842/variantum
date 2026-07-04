@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.variantum.config.AppProperties;
 import ru.variantum.dto.response.AnalysisResponse;
+import ru.variantum.event.EventPublisher;
 
 import java.util.Map;
 
@@ -17,6 +18,7 @@ public class AnalyzeService {
     private final PromptBuilder promptBuilder;
     private final LlmJsonUtil llmJsonUtil;
     private final AppProperties appProperties;
+    private final EventPublisher eventPublisher;
 
     public AnalysisResponse analyze(String taskText, String hintSubject) {
         log.info("Запуск анализа задания ({} символов)", taskText.length());
@@ -28,6 +30,8 @@ public class AnalyzeService {
                 .completion(prompt, appProperties.gigachat().temperatureValidate(),
                         appProperties.gigachat().modelMax())
                 .block();
-        return llmJsonUtil.parse(raw, AnalysisResponse.class);
+        AnalysisResponse response = llmJsonUtil.parse(raw, AnalysisResponse.class);
+        eventPublisher.publishDocumentAnalyzed(hintSubject != null ? hintSubject : "unknown", taskText.length());
+        return response;
     }
 }

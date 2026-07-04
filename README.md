@@ -93,6 +93,7 @@
 | **LLM** | GigaChat API (мультимодель: Lite / Pro / Max), авто-фолбэк 402 → Lite |
 | **Парсинг** | Apache PDFBox, Apache POI, Tess4J (Tesseract OCR, русская модель) |
 | **Экспорт** | iText 7 (PDF), docx4j (DOCX), SVG-рендеринг формул и графиков |
+| **Асинхронные события** | Apache Kafka, Spring Kafka (producer в backend, consumer в отдельном сервисе `variantum-worker`) |
 | **Инфраструктура** | Docker + docker-compose, Nginx (reverse proxy + статика) |
 
 ---
@@ -115,15 +116,24 @@ Nginx (80)
                        ├── FileController     загрузка файлов → MinIO
                        └── LimitsController   лимиты на генерацию
                                 │
-                    ┌───────────┼───────────┐
-                    ▼           ▼           ▼
-               PostgreSQL     Redis      MinIO
-               (данные)     (кэш/сессии) (файлы)
-                                │
-                                ▼
-                          GigaChat API
-                     (Lite / Pro / Max)
+                    ┌───────────┼───────────┬───────────┐
+                    ▼           ▼           ▼           ▼
+               PostgreSQL     Redis      MinIO       Kafka
+               (данные)     (кэш/сессии) (файлы)   (события)
+                                │                       │
+                                ▼                       ▼
+                          GigaChat API          variantum-worker (8081)
+                     (Lite / Pro / Max)          независимый сервис —
+                                                  слушает variantum.export.completed
+                                                  и variantum.document.analyzed,
+                                                  пишет статистику в свои таблицы
 ```
+
+Экспорт (PDF/DOCX) и анализ эталона синхронно отдают результат вызывающему,
+как и раньше — публикация события в Kafka происходит уже после того, как
+ответ готов, неблокирующе (fire-and-forget), и не влияет на основной запрос.
+Если Kafka недоступна или отключена (`KAFKA_ENABLED=false`), backend и API
+продолжают работать без изменений.
 
 ---
 
@@ -136,14 +146,20 @@ variantum/
 │       ├── controller/ REST-контроллеры
 │       ├── service/    бизнес-логика (llm/, auth/, export/)
 │       ├── domain/     JPA-сущности
-│       └── config/     конфигурация (Security, GigaChat, MinIO)
+│       ├── event/      Kafka-producer доменных событий (export/analyze)
+│       └── config/     конфигурация (Security, GigaChat, MinIO, Kafka)
+├── worker/             variantum-worker — Kafka-consumer (Maven, Java 21)
+│   └── src/main/java/ru/variantum/worker/
+│       ├── listener/   @KafkaListener на топики backend'а
+│       ├── domain/     собственные JPA-сущности (своя часть схемы БД)
+│       └── controller/ /stats — статистика по принятым событиям
 ├── frontend/           React + Vite + TypeScript
 │   └── src/
 │       ├── pages/      9 экранов приложения
 │       ├── features/   экспорт, редактор
 │       ├── tour/       интерактивный онбординг
 │       └── api/        клиентский слой
-├── docker-compose.yml  postgres + redis + minio + backend + frontend + nginx
+├── docker-compose.yml  postgres + redis + minio + kafka + backend + worker + frontend + nginx
 ├── .env.example        пример переменных окружения
 └── README.md
 ```
@@ -175,6 +191,9 @@ Backend (Java / Spring Boot):
 - проектирование доменной модели и схемы PostgreSQL, миграции через Flyway; кэш и сессии на Redis;
 - интеграция GigaChat API с авто-фолбэком, распознавание документов (PDFBox / POI / Tesseract OCR);
 - экспорт комплектов в PDF / DOCX (iText, docx4j), загрузка файлов в MinIO (S3);
+- вынес аналитику экспорта и анализа документов в отдельный сервис `variantum-worker`:
+  backend публикует события в Kafka (producer), worker их слушает и хранит статистику
+  в своих таблицах (consumer) — независимый деплой, чёткая граница ответственности;
 - развёртывание стека в Docker / docker-compose за Nginx.
 
 ## Команда

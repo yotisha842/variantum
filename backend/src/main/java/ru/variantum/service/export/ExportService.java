@@ -15,6 +15,7 @@ import ru.variantum.dto.request.ExportRequest;
 import ru.variantum.dto.response.ProjectDetailResponse;
 import ru.variantum.dto.response.TaskResponse;
 import ru.variantum.dto.response.VariantResponse;
+import ru.variantum.event.EventPublisher;
 import ru.variantum.service.project.ProjectService;
 import ru.variantum.util.FormulaConverter;
 
@@ -72,6 +73,7 @@ public class ExportService {
     private final ProjectService projectService;
     private final FormulaConverter formulaConverter;
     private final GraphSvgRenderer graphSvgRenderer;
+    private final EventPublisher eventPublisher;
 
     public record ExportResult(String filename, String contentType, byte[] bytes) {}
 
@@ -84,7 +86,9 @@ public class ExportService {
             ConverterProperties props = new ConverterProperties();
             props.setFontProvider(buildFontProvider());
             HtmlConverter.convertToPdf(html, baos, props);
-            return new ExportResult(filename(project, "pdf"), "application/pdf", baos.toByteArray());
+            byte[] bytes = baos.toByteArray();
+            eventPublisher.publishExportCompleted(projectId, userId, "pdf", bytes.length);
+            return new ExportResult(filename(project, "pdf"), "application/pdf", bytes);
         } catch (Exception e) {
             log.error("Ошибка экспорта PDF проекта {}: {}", projectId, e.getMessage(), e);
             throw new RuntimeException("Не удалось сформировать PDF: " + e.getMessage(), e);
@@ -173,9 +177,11 @@ public class ExportService {
             }
 
             pkg.save(baos);
+            byte[] bytes = baos.toByteArray();
+            eventPublisher.publishExportCompleted(projectId, userId, "docx", bytes.length);
             return new ExportResult(filename(project, "docx"),
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    baos.toByteArray());
+                    bytes);
         } catch (Exception e) {
             log.error("Ошибка экспорта DOCX проекта {}: {}", projectId, e.getMessage(), e);
             throw new RuntimeException("Не удалось сформировать DOCX: " + e.getMessage(), e);
